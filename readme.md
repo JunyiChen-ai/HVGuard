@@ -54,15 +54,17 @@ python video_to_audio.py -i "./Multihateclip/Chinese/video/train" -o "./Multihat
 python extract_emotion.py -i "./Multihateclip/Chinese/"
 ```
 After preprocessing, a complete `annotation(new).json` file will be generated.
+
 4. Generate MLLM rationale with CoT
 ```bash
 python CoT.py --dataset_name Multihateclip --language Chinese
 ```
-6. Extract embeddings
+
+5. Extract embeddings
 ```bash
 python audio_embedding.py
 python frames_embedding.py
 python text_embedding.py
 ```
-7. Train and predict(same as Quick Start)
 
+6. Train and predict(same as Quick Start)
