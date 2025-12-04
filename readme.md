@@ -69,3 +69,17 @@ python text_embedding.py
 
 6. Train and predict(same as Quick Start)
 
+---
+
+## 📝 Citation
+
+If you find this repository or our paper useful for your research, please consider citing:
+
+```bibtex
+@inproceedings{jing2025hvguard,
+  title={HVGuard: Utilizing Multimodal Large Language Models for Hateful Video Detection},
+  author={Jing, Yiheng and Zhang, Mingming and Zhuang, Yong and Guo, Jiacheng and Wang, Juan and Xu, Xiaoyang and Yi, Wenzhe and Guo, Keyan and Hu, Hongxin},
+  booktitle={Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing},
+  pages={9004--9017},
+  year={2025}
+}
