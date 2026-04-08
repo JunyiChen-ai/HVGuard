@@ -1,0 +1,21 @@
+.env
+
+# Local model checkpoints and generated features
+saved_models/
+embeddings/**/*.pth
+embeddings/**/*.pth.bk
+
+# Large raw dataset assets
+datasets/HateMM/audios/
+datasets/HateMM/frames/
+datasets/HateMM/quad/
+datasets/HateMM/video
+datasets/HateMM/videos_flat/
+datasets/Multihateclip/Chinese/audios/
+datasets/Multihateclip/Chinese/frames/
+datasets/Multihateclip/Chinese/quad/
+datasets/Multihateclip/Chinese/video
+datasets/Multihateclip/English/audios/
+datasets/Multihateclip/English/frames/
+datasets/Multihateclip/English/quad/
+datasets/Multihateclip/English/video
