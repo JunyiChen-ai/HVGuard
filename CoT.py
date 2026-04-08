@@ -8,8 +8,15 @@ from openai import OpenAI, APIConnectionError, RateLimitError
 import time
 
 import base64
+from dotenv import load_dotenv
 
-client = OpenAI(base_url='', api_key='') # Set the OpenAI API key
+load_dotenv()
+
+MODEL_NAME = os.getenv("OPENAI_MODEL", "qwen2.5-vl-72b-instruct")
+client = OpenAI(
+    base_url=os.getenv("OPENAI_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),
+    api_key=os.getenv("OPENAI_API_KEY"),
+)
 
 def analyze_video_with_gpt4(prompt):
     """
@@ -28,7 +35,7 @@ def analyze_video_with_gpt4(prompt):
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model=MODEL_NAME,
                 messages=[
                     {"role": "system", "content": instruction},
                     {"role": "user", "content": prompt},
@@ -57,7 +64,7 @@ def describe_video_frames(frames, prompt):
         base64_image = encode_image(frame_path)
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model=MODEL_NAME,
                 messages=[
                     {
                         "role": "user",
@@ -85,7 +92,7 @@ def describe_video_frames(frames, prompt):
 def describe_video_text(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
@@ -103,6 +110,17 @@ def process(data_path, save_path, frame_step):
     with open(data_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
 
+    if os.path.exists(save_path):
+        with open(save_path, 'r', encoding='utf-8') as file:
+            saved_data = json.load(file)
+        saved_map = {
+            item.get("Video_ID"): item for item in saved_data if item.get("Video_ID")
+        }
+        for item in data:
+            saved_item = saved_map.get(item.get("Video_ID"))
+            if saved_item:
+                item.update(saved_item)
+
     total_start_time = time.time()
 
     for item in data:
@@ -115,6 +133,10 @@ def process(data_path, save_path, frame_step):
         video_vision = item.get("Frames_description")
         video_text = item.get("Text_description")
         video_label = item.get("Label")
+
+        if item.get("Mix_description"):
+            print(f"Skipping video: {video_id} (already processed)")
+            continue
 
         if os.path.isdir(video_path):
             frames_list = [
@@ -138,12 +160,15 @@ def process(data_path, save_path, frame_step):
         frames_output = describe_video_frames(video_frames, vision_prompt)
         item["Frames_description"] = frames_output[0]
 
-        if video_transcript == "None":
+        if not video_transcript or video_transcript == "None":
             item["Text_description"] = "None"
         else:
             text_prompt = f"""The title of the video is "{video_title}". The transcript in the video is as follows: "{video_transcript}". Please analyze the meaning of the text. Note that there may be homophonic memes and puns, distinguish and explain them but do not over interpret while ensuring the correctness of the answer and be concise."""
             text_output = describe_video_text(text_prompt)
             item["Text_description"] = text_output[0]
+
+        video_vision = item.get("Frames_description")
+        video_text = item.get("Text_description")
 
         mix_prompt = f"""
         Please combine the video title, trainscript, voice emotion, video text description, video frames description and analyze both the visual, textual and audio elements of the video to detect and flag any hateful content.
@@ -165,6 +190,9 @@ def process(data_path, save_path, frame_step):
         video_end_time = time.time()
         print(
             f"Time taken for video {video_id}: {video_end_time - video_start_time:.2f} seconds")
+
+        with open(save_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
 
     with open(save_path, 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
@@ -191,7 +219,7 @@ def main():
         data_path = f'./datasets/Multihateclip/'+Language[0]+f'/annotation(new).json'
         save_path = f'./datasets/Multihateclip/'+Language[0]+f'/data.json'
     elif Dataset_name[0] == 'HateMM':
-        data_path = f'./datasets/HateMM/annotation(new).json'
+        data_path = f'./datasets/HateMM/annotation(re).json'
         save_path = f'./datasets/HateMM/data.json'
         
     frame_step = 1

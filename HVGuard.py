@@ -1,5 +1,6 @@
 import datetime
 import argparse
+import csv
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -294,7 +295,7 @@ def validate(model, dataloader, criterion, num_classes, device='cpu'):
             label1_recall / len(dataloader), label1_precision / len(dataloader), label1_f1 / len(dataloader), label0_recall / len(dataloader), label0_precision / len(dataloader), label0_f1 / len(dataloader))
 
 
-def evaluate(model, criterion, trained_model_path, dataset, video_ids, best_state, num_classes):
+def evaluate(model, criterion, trained_model_path, dataset, video_ids, best_state, num_classes, split_ids=None):
     """
     Evaluate the model's performance on the validation and test sets, and report the evaluation results.
 
@@ -311,10 +312,14 @@ def evaluate(model, criterion, trained_model_path, dataset, video_ids, best_stat
     model.load_state_dict(torch.load(trained_model_path))
     model.to(device)
     model.eval() 
-    test_ids, temp_ids = train_test_split(
-        video_ids, test_size=0.8, random_state=best_state)
-    val_ids, train_ids = train_test_split(
-        temp_ids, test_size=0.875, random_state=best_state)
+    if split_ids is not None:
+        available_ids = set(video_ids)
+        test_ids = [vid for vid in split_ids['test'] if vid in available_ids]
+    else:
+        test_ids, temp_ids = train_test_split(
+            video_ids, test_size=0.8, random_state=best_state)
+        val_ids, train_ids = train_test_split(
+            temp_ids, test_size=0.875, random_state=best_state)
     test_dataset = torch.utils.data.Subset(
         dataset, [dataset.video_ids.index(id) for id in test_ids])
     test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
@@ -357,6 +362,8 @@ def parse_args():
                         choices=[2, 3], help='Number of classes for classification')
     parser.add_argument('--mode', type=str, default='predict',
                         choices=['train', 'predict'], help='Training mode or prediction mode')
+    parser.add_argument('--split_mode', type=str, default='random',
+                        choices=['random', 'fixed'], help='Use random split or predefined split files')
 
     return parser.parse_args()
 
@@ -381,6 +388,15 @@ def get_paths_and_best_state(config, dataset_name, language, num_classes):
             return entry['paths'], entry['best_state']
     raise ValueError(
         f"Invalid combination of dataset_name, language, num_classes: {dataset_name}, {language}, {num_classes}")
+
+
+def load_split_ids(split_dir):
+    split_ids = {}
+    for split_name in ['train', 'valid', 'test']:
+        split_path = os.path.join(split_dir, f'{split_name}.csv')
+        with open(split_path, 'r', encoding='utf-8') as f:
+            split_ids[split_name] = [row[0] for row in csv.reader(f) if row]
+    return split_ids
 
 
 def main():
@@ -438,12 +454,28 @@ def main():
 
     # random_state = random.randint(0, 10000)
     random_state = best_state
+    split_ids = None
 
-    # Split the dataset (70% training, 20% test, 10% validation)
-    test_ids, temp_ids = train_test_split(
-        video_ids, test_size=0.8, random_state=random_state)
-    val_ids, train_ids = train_test_split(
-        temp_ids, test_size=0.875, random_state=random_state)
+    if args.split_mode == 'fixed':
+        if Dataset_name[0] == 'HateMM':
+            split_dir = './datasets/HateMM/splits'
+        else:
+            split_dir = f'./datasets/{Dataset_name[0]}/{Language[0]}/splits'
+        split_ids = load_split_ids(split_dir)
+        available_ids = set(video_ids)
+        train_ids = [vid for vid in split_ids['train'] if vid in available_ids]
+        val_ids = [vid for vid in split_ids['valid'] if vid in available_ids]
+        test_ids = [vid for vid in split_ids['test'] if vid in available_ids]
+        print(
+            f"Using fixed split from {split_dir}: "
+            f"train={len(train_ids)}, valid={len(val_ids)}, test={len(test_ids)}"
+        )
+    else:
+        # Split the dataset (70% training, 20% test, 10% validation)
+        test_ids, temp_ids = train_test_split(
+            video_ids, test_size=0.8, random_state=random_state)
+        val_ids, train_ids = train_test_split(
+            temp_ids, test_size=0.875, random_state=random_state)
 
     train_dataset = torch.utils.data.Subset(
         dataset, [dataset.video_ids.index(id) for id in train_ids])
@@ -513,7 +545,7 @@ def main():
     else:
         best_model = model_path
     evaluate(model, criterion, best_model, dataset,
-             video_ids, random_state, num_classes)
+             video_ids, random_state, num_classes, split_ids=split_ids)
 
 
 if __name__ == '__main__':
